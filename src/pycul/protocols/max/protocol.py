@@ -503,6 +503,7 @@ class MaxProtocol(CulProtocol):
             await asyncio.sleep(PROBE_DELAY)
             if address in self.devices:
                 return  # adopted meanwhile
+        _LOGGER.debug("Probing %s (%s), listening_now=%s", address, device_type.name, listening_now)
         queued = self.enqueue(
             address,
             MessageType.TIME_INFORMATION,
@@ -783,7 +784,13 @@ class MaxProtocol(CulProtocol):
             payload=message.payload,
         )
         command = ("Zs" if preamble else "Zf") + frame.to_hex()
-        _LOGGER.debug("Sending %s via %s (attempt %d)", frame, cul.name, message.attempts + 1)
+        _LOGGER.debug(
+            "Sending %s via %s (%s, attempt %d)",
+            frame,
+            cul.name,
+            "Zs with 1 s preamble" if preamble else "Zf fast, no preamble",
+            message.attempts + 1,
+        )
         if not message.wait_for_ack:
             await cul.async_send(command)
             return None

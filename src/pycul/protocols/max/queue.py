@@ -182,6 +182,7 @@ class SendQueue:
                 queued.released = True
                 released = True
         if released:
+            _LOGGER.debug("Releasing held frames for %s (device just transmitted)", address)
             self._changed.set()
 
     def count_for(self, address: str, msg_type: MessageType | None = None) -> int:
@@ -307,7 +308,13 @@ class SendQueue:
                 await self._wait(NO_CUL_WAIT)
                 continue
 
-            preamble = not self._is_awake(message.dst)
+            # A frame released into a shutter contact's listening window (the
+            # device just transmitted) must go out fast: the contact stops
+            # listening after a fraction of a second, long before the 1 s
+            # wake-up preamble is over.
+            preamble = not self._is_awake(message.dst) and not (
+                message.hold_until_released and message.released
+            )
             if message.refresh is not None:
                 try:
                     message.payload = message.refresh()
