@@ -265,6 +265,12 @@ class SendQueue:
         self._notify()
 
     def _next(self) -> OutgoingMessage | None:
+        # A frame released into a device's listening window goes first: the
+        # window lasts a fraction of a second and cannot wait behind e.g. a
+        # credit-starved frame at the queue head.
+        for queued in self._queue:
+            if queued.hold_until_released and queued.released:
+                return queued
         for queued in self._queue:
             if not queued.hold_until_released or queued.released:
                 return queued
