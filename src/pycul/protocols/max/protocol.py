@@ -695,7 +695,7 @@ class MaxProtocol(CulProtocol):
         # answer and only listens right after each ping: answer once, before
         # anything else in the queue.
         try:
-            await self.send(
+            queued = self.enqueue(
                 device.address,
                 MessageType.PAIR_PONG,
                 b"\x00",
@@ -703,6 +703,12 @@ class MaxProtocol(CulProtocol):
                 key=(device.address, MessageType.PAIR_PONG),
                 first=True,
             )
+            # The device listens only right after its PairPing, long before a
+            # wake-up preamble is over: answer into that window without one
+            # (as the probe does). A failed attempt waits for the next ping.
+            queued.hold_until_released = True
+            queued.released = True
+            await queued.future
             _LOGGER.info("Paired MAX! device %s", device.address)
             if device.device_type.is_thermostat:
                 await self.send_time_information(device.address)
