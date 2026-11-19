@@ -77,6 +77,10 @@ TIME_SYNC_CHECK_INTERVAL = 300.0
 DUPLICATE_WINDOW = 2.0
 #: Seconds a device stays awake after an acknowledged WakeUp (31 s minus margin, FHEM).
 WAKE_UP_DURATION = 26.0
+#: Ack timeout for frames released into a device's post-transmission window.
+#: The device answers within ~100 ms; the long default would hold the queue
+#: past the next listening window.
+WINDOW_ACK_TIMEOUT = 1.0
 #: Wait after hearing a device before asking it whether it is ours: devices
 #: answer each other first, and a frame sent into that exchange collides.
 PROBE_DELAY = 3.0
@@ -805,7 +809,12 @@ class MaxProtocol(CulProtocol):
         self._ack_waiters[key] = future
         try:
             await cul.async_send(command)
-            async with asyncio.timeout(ACK_TIMEOUT):
+            timeout = (
+                WINDOW_ACK_TIMEOUT
+                if message.hold_until_released and message.released
+                else ACK_TIMEOUT
+            )
+            async with asyncio.timeout(timeout):
                 ack = await future
         except TimeoutError:
             raise NoAckError(f"No Ack from {message.dst} for {message.msg_type.name}") from None

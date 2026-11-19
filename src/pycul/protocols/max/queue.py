@@ -175,15 +175,18 @@ class SendQueue:
         return message
 
     def release(self, address: str) -> None:
-        """Mark held frames to `address` as sendable (the device just transmitted)."""
-        released = False
+        """Mark a held frame to `address` as sendable (the device just transmitted).
+
+        One frame per window: the device listens for a fraction of a second
+        after transmitting, enough for exactly one frame and its Ack. The
+        others wait for their own window instead of being sent too late.
+        """
         for queued in self._queue:
-            if queued.dst == address and queued.hold_until_released:
+            if queued.dst == address and queued.hold_until_released and not queued.released:
                 queued.released = True
-                released = True
-        if released:
-            _LOGGER.debug("Releasing held frames for %s (device just transmitted)", address)
-            self._changed.set()
+                _LOGGER.debug("Releasing held frame %s (device just transmitted)", queued)
+                self._changed.set()
+                break
 
     def count_for(self, address: str, msg_type: MessageType | None = None) -> int:
         """Return the number of queued frames to `address` (optionally of one type)."""
